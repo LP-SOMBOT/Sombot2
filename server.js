@@ -49,30 +49,38 @@ function initializeBotListeners() {
 
         sock.ev.on('creds.update', saveCreds);
 
-        // --- NEW TAGALL ON EVERY MESSAGE LOGIC ---
+        // --- FINAL "DELETE AND REPLACE" LOGIC ---
         sock.ev.on('messages.upsert', async (m) => {
             try {
                 const msg = m.messages[0];
-                if (!msg.message || msg.key.fromMe) return; // Don't react to own messages
+                if (!msg.message || msg.key.fromMe) return;
 
                 const remoteJid = msg.key.remoteJid;
                 const isGroup = remoteJid.endsWith('@g.us');
                 
-                // Only activate in groups
                 if (isGroup) {
                     const messageText = msg.message.conversation || msg.message.extendedTextMessage?.text || "";
-
-                    // If there's no text content (e.g., an image with no caption), do nothing.
                     if (!messageText.trim()) return;
 
                     const metadata = await sock.groupMetadata(remoteJid);
                     const participants = metadata.participants.map(p => p.id);
+                    
+                    // --- THE FIX IS HERE ---
+                    // 1. Check if the bot is a group admin
+                    const botIsAdmin = !!metadata.participants.find(p => p.id === sock.user.id)?.admin;
 
-                    // Re-send the original message, but with a mention to everyone
-                    await sock.sendMessage(remoteJid, {
-                        text: messageText,
-                        mentions: participants
-                    });
+                    // 2. Only proceed if the bot has admin permissions
+                    if (botIsAdmin) {
+                        // 3. Delete the user's original message
+                        await sock.sendMessage(remoteJid, { delete: msg.key });
+
+                        // 4. Send the new message with the same text, mentioning everyone
+                        await sock.sendMessage(remoteJid, {
+                            text: messageText,
+                            mentions: participants
+                        });
+                    }
+                    // If the bot is not an admin, it will now do nothing, preventing duplicate messages.
                 }
             } catch (error) {
                 console.error("An error occurred in the message handler:", error);
