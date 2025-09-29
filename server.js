@@ -4,9 +4,10 @@ const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = requi
 const admin = require('firebase-admin');
 const fs = require('fs');
 
+// --- SETUP ---
 const SERVICE_ACCOUNT_PATH = './serviceAccountKey.json';
 if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
-    console.error("CRITICAL ERROR: serviceAccountKey.json not found!");
+    console.error("FATAL ERROR: serviceAccountKey.json not found!");
     process.exit(1);
 }
 const serviceAccount = require(SERVICE_ACCOUNT_PATH);
@@ -22,7 +23,7 @@ app.use(express.static(path.join(__dirname, 'client', 'build')));
 
 function initializeBotListeners() {
     const activeBots = new Map();
-    const userMenuState = new Map(); // Tracks which menu a user is in
+    const userMenuState = new Map();
 
     async function startBot(uid) {
         if (activeBots.has(uid)) return;
@@ -38,16 +39,16 @@ function initializeBotListeners() {
                 await db.collection('bots').doc(uid).update({ status: 'CONNECTED', pairingCode: null });
                 const botJid = sock.user.id;
                 const botSettings = (await db.collection('bots').doc(uid).get()).data();
-                const welcomeMessage = `*Introduction:*\nWelcome, Owner. I am Night Owl, your dedicated assistant. All systems are operational and I am ready to execute your commands. Type .menu to begin.\n\n` +
-                                     `*Core Information:*\n- Bot Name: Night Wa Bot </>\n- Version: 2.0.0\n- Owner: ${botSettings.ownerEmail || 'You'}\n- Bot Number: ${botJid.split(':')[0]}\n\n` +
-                                     `*Current Settings:*\n- Visibility Mode: Online\n- Permissions: ${botSettings.botMode || 'public'}\n- Reject Calls: On`;
+                const welcomeMessage = `*Night Wa Bot </> is now online!* ✨\n\n` +
+                    `Type .menu to see all available commands. If you need help or want to report a bug, please join our support group.\n\n` +
+                    `*Developed by Prince LP*`;
                 await sock.sendMessage(botJid, { text: welcomeMessage });
             }
             if (connection === 'close') {
-                const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+                const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
                 activeBots.delete(uid);
-                if (shouldReconnect) { startBot(uid); } 
-                else { await db.collection('bots').doc(uid).update({ status: 'LOGGED_OUT' }); }
+                if (shouldReconnect) startBot(uid);
+                else await db.collection('bots').doc(uid).update({ status: 'LOGGED_OUT' });
             }
         });
 
@@ -69,17 +70,28 @@ function initializeBotListeners() {
             const ownerJid = botSettings.phoneNumber + "@s.whatsapp.net";
             if (botSettings.botMode === 'private' && sender !== ownerJid) return;
 
-            // --- ANTILINK LOGIC (FIXED) ---
             if (isGroup && (messageText.includes('https://chat.whatsapp.com') || messageText.includes('http://'))) {
                 const groupDoc = await db.collection('bots').doc(uid).collection('groups').doc(remoteJid).get();
                 if (groupDoc.exists() && groupDoc.data().antilink) {
                     const metadata = await sock.groupMetadata(remoteJid);
-                    const botIsAdmin = !!metadata.participants.find(p => p.id === sock.user.id)?.admin; // The FIX is here
+                    const botIsAdmin = !!metadata.participants.find(p => p.id === sock.user.id)?.admin;
                     if (botIsAdmin) {
                         const senderIsAdmin = !!metadata.participants.find(p => p.id === sender)?.admin;
                         if (!senderIsAdmin) {
                             await sock.sendMessage(remoteJid, { delete: msg.key });
-                            await sock.sendMessage(remoteJid, { text: `@${sender.split('@')[0]} ⚠️ Links are not allowed here.`, mentions: [sender]}, { quoted: msg });
+                            
+                            const memberRef = db.collection('bots').doc(uid).collection('groups').doc(remoteJid).collection('members').doc(sender);
+                            const memberDoc = await memberRef.get();
+                            let warningCount = (memberDoc.exists() ? memberDoc.data().warningCount : 0) + 1;
+
+                            if (warningCount >= 3) {
+                                await sock.sendMessage(remoteJid, { text: `@${sender.split('@')[0]} has been removed after 3 warnings for sending links.`, mentions: [sender] });
+                                await sock.groupParticipantsUpdate(remoteJid, [sender], "remove");
+                                await memberRef.delete();
+                            } else {
+                                await memberRef.set({ warningCount: warningCount });
+                                await sock.sendMessage(remoteJid, { text: `@${sender.split('@')[0]} ⚠️ links are not allowed here. This is warning ${warningCount} of 3.`, mentions: [sender] });
+                            }
                         }
                     }
                 }
@@ -88,22 +100,17 @@ function initializeBotListeners() {
             const prefix = ".";
             const isOwner = sender === ownerJid;
             
-            // --- MENU STATE LOGIC ---
             if (userMenuState.get(sender) && /^\d+$/.test(messageText)) {
-                const menuChoice = parseInt(messageText);
-                const currentState = userMenuState.get(sender);
-                userMenuState.delete(sender); // Reset state after use
+                const choice = parseInt(messageText);
+                const state = userMenuState.get(sender);
+                userMenuState.delete(sender);
 
-                if (currentState === 'main_menu') {
-                    if (menuChoice === 2) { // Owner Menu
-                        return await sock.sendMessage(remoteJid, { text: "👑 *Owner Menu*\n\n- .>\n- .addowner\n- .block\n- .join" }, { quoted: msg });
-                    }
-                    if (menuChoice === 3) { // Group Menu
-                        return await sock.sendMessage(remoteJid, { text: "👥 *Group Menu*\n\n- .antilink\n- .kick\n- .tagall" }, { quoted: msg });
-                    }
+                if (state === 'main_menu') {
+                    if (choice === 2) return await sock.sendMessage(remoteJid, { text: "👑 *Owner Menu*\n\n- .mode public|private" }, { quoted: msg });
+                    if (choice === 3) return await sock.sendMessage(remoteJid, { text: "👥 *Group Menu*\n\n- .antilink on|off\n- .tagall [message]" }, { quoted: msg });
                 }
             }
-            
+
             if (!messageText.startsWith(prefix)) return;
             const command = messageText.slice(prefix.length).trim().split(' ')[0].toLowerCase();
             const args = messageText.trim().split(/ +/).slice(1);
@@ -117,35 +124,25 @@ function initializeBotListeners() {
             }
 
             switch (command) {
-                case 'ping':
-                    await sock.sendMessage(remoteJid, { text: 'Pong! ⚡' }, { quoted: msg });
-                    break;
-
+                case 'ping': await sock.sendMessage(remoteJid, { text: 'Pong! ⚡' }, { quoted: msg }); break;
                 case 'menu':
-                    const menuText = `*HELLO I'M NIGHT WA BOT*\n\n` +
-                      `1 › OWNER MENU\n` +
-                      `2 › GROUP MENU\n` +
-                      `3 › FUN MENU\n` +
-                      `4 › ALL COMMANDS`;
+                    const menuText = `*HELLO I'M NIGHT WA BOT*\n_Developed by Prince LP_\n\n` + `1 › DOWNLOAD MENU\n2 › OWNER MENU\n3 › GROUP MENU\n4 › FUN MENU\n5 › ALL COMMANDS`;
                     userMenuState.set(sender, 'main_menu');
                     await sock.sendMessage(remoteJid, { text: menuText }, { quoted: msg });
-                    setTimeout(() => userMenuState.delete(sender), 60000); // State expires in 60s
+                    setTimeout(() => userMenuState.delete(sender), 60000);
                     break;
-                
                 case 'mode':
                     if (!isOwner) return await sock.sendMessage(remoteJid, { text: "🔒 This is an owner-only command." }, { quoted: msg });
                     const mode = args[0]?.toLowerCase();
                     if (mode === 'public' || mode === 'private') {
                         await db.collection('bots').doc(uid).update({ botMode: mode });
                         await sock.sendMessage(remoteJid, { text: `✅ Bot mode set to *${mode}*.` }, { quoted: msg });
-                    } else { await sock.sendMessage(remoteJid, { text: "Usage: .mode public | private" }, { quoted: msg }); }
+                    } else { await sock.sendMessage(remoteJid, { text: "Usage: .mode public|private" }, { quoted: msg }); }
                     break;
-
                 case 'antilink':
                     if (!isGroup) return await sock.sendMessage(remoteJid, { text: "This command only works in groups." }, { quoted: msg });
                     if (!isAdmin) return await sock.sendMessage(remoteJid, { text: "🔒 This is a group admin-only command." }, { quoted: msg });
                     if (!botIsAdmin) return await sock.sendMessage(remoteJid, { text: "I need to be an admin to manage links." }, { quoted: msg });
-                    
                     const option = args[0]?.toLowerCase();
                     const groupSettingsRef = db.collection('bots').doc(uid).collection('groups').doc(remoteJid);
                     if (option === 'on') {
@@ -156,7 +153,6 @@ function initializeBotListeners() {
                         await sock.sendMessage(remoteJid, { text: "❌ Anti-link has been turned OFF." }, { quoted: msg });
                     } else { await sock.sendMessage(remoteJid, { text: "Usage: .antilink on | off" }, { quoted: msg }); }
                     break;
-                
                 case 'tagall':
                     if (!isGroup || !isAdmin) return await sock.sendMessage(remoteJid, { text: "🔒 This is a group admin-only command." }, { quoted: msg });
                     const message = args.join(' ') || 'Attention everyone!';
@@ -183,9 +179,7 @@ function initializeBotListeners() {
         snapshot.docChanges().forEach(change => {
             const uid = change.doc.id;
             const data = change.doc.data();
-            if ((change.type === 'added' || change.type === 'modified') && data.status === 'REQUESTING_QR' && !activeBots.has(uid)) {
-                startBot(uid);
-            }
+            if ((change.type === 'added' || change.type === 'modified') && data.status === 'REQUESTING_QR' && !activeBots.has(uid)) { startBot(uid); }
             if (change.type === 'removed' && activeBots.has(uid)) {
                 activeBots.get(uid).logout();
                 activeBots.delete(uid);
