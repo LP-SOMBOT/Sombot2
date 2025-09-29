@@ -22,28 +22,15 @@ const AuthProvider = ({ children }) => {
 const PrivateRoute = ({ children }) => (useAuth().currentUser ? children : <Navigate to="/login" />);
 
 // --- PAGES ---
-const HomePage = () => {
-    const [title, setTitle] = useState("Simplicity.");
-    useEffect(() => {
-        const titles = ["Simplicity.", "Automation.", "Control."];
-        let i = 0;
-        const intervalId = setInterval(() => { i = (i + 1) % titles.length; setTitle(titles[i]); }, 3000);
-        return () => clearInterval(intervalId);
-    }, []);
-
-    return (
-        <div className="bg-[#100e1f] min-h-screen flex flex-col items-center justify-center text-white p-4">
-            <div className="text-center w-full max-w-2xl">
-                <h1 className="text-5xl md:text-7xl font-bold mb-4">The Future of WhatsApp is <span className="text-purple-400 glow-purple">{title}</span></h1>
-                <p className="text-gray-400 text-lg md:text-xl mb-8">Harness the power of Night Wa Bot. Fully customizable, blazingly fast, and managed from a stunning web dashboard.</p>
-                <div className="flex justify-center gap-4">
-                    <Link to="/dashboard"><button className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-lg transition duration-300">Create Your Bot Free</button></Link>
-                    <Link to="/login"><button className="bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 px-8 rounded-lg transition duration-300">Dashboard Login</button></Link>
-                </div>
-            </div>
+const HomePage = () => (
+    <div className="bg-[#100e1f] min-h-screen flex flex-col items-center justify-center text-white p-4">
+        <div className="text-center w-full max-w-2xl">
+            <h1 className="text-5xl md:text-7xl font-bold mb-4">Seamless Group <span className="text-purple-400 glow-purple">Mentions</span></h1>
+            <p className="text-gray-400 text-lg md:text-xl mb-8">Create a bot that automatically mentions all group members on every message.</p>
+            <Link to="/dashboard"><button className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-lg transition duration-300">Create Your Bot</button></Link>
         </div>
-    );
-};
+    </div>
+);
 
 const LoginPage = () => {
   const emailRef = useRef(); const passwordRef = useRef();
@@ -93,14 +80,13 @@ const DashboardPage = () => {
     if (phone && /^\d+$/.test(phone)) {
       setLoading(true);
       await setDoc(doc(db, 'bots', currentUser.uid), {
-        ownerId: currentUser.uid, phoneNumber: phone, status: 'REQUESTING_QR', prefix: '.',
-        pairingCode: null, botMode: 'private', ownerEmail: currentUser.email,
+        ownerId: currentUser.uid, phoneNumber: phone, status: 'REQUESTING_QR', pairingCode: null,
       });
     } else { alert("Invalid number format."); }
   };
 
   const handleDeleteBot = async () => {
-    if (window.confirm("Are you sure? This will permanently delete your bot and its session.")) {
+    if (window.confirm("Are you sure? This will permanently delete your bot.")) {
         setLoading(true); await deleteDoc(doc(db, 'bots', currentUser.uid));
     }
   };
@@ -126,7 +112,6 @@ const DashboardPage = () => {
             <div>
               <h3 className="text-lg font-semibold text-white">Status: <span className={botData.status === 'CONNECTED' ? 'text-green-400' : 'text-yellow-400'}>{botData.status}</span></h3>
               <p className="text-gray-400"><strong>Phone:</strong> +{botData.phoneNumber}</p>
-              <p className="text-gray-400"><strong>Mode:</strong> {botData.botMode || 'private'}</p>
             </div>
             
             {botData.status === 'REQUESTING_QR' && (
@@ -137,8 +122,6 @@ const DashboardPage = () => {
                 </> : <p>Requesting pairing code...</p>}
               </div>
             )}
-
-            {botData.status === 'LOGGED_OUT' && <div className="bg-red-500/20 text-red-400 p-3 rounded-lg"><p>⚠️ Bot was logged out.</p><button className="mt-2 text-sm bg-purple-600 px-3 py-1 rounded" onClick={handleCreateBot}>Re-Link</button></div>}
             
             <button className="w-full bg-red-600/50 hover:bg-red-600/70 text-white font-bold py-2 rounded-lg" onClick={handleDeleteBot}>Delete Bot</button>
           </div>
