@@ -4,47 +4,56 @@ import { auth, db } from './firebase';
 import { onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, onSnapshot, setDoc, deleteDoc } from 'firebase/firestore';
 
-// --- AUTHENTICATION CONTEXT ---
+// --- AUTH CONTEXT ---
 const AuthContext = React.createContext();
 const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
-
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, user => {
-      setCurrentUser(user);
-      setLoading(false);
-    });
+    const unsubscribe = onAuthStateChanged(auth, user => { setCurrentUser(user); setLoading(false); });
     return unsubscribe;
   }, []);
-
   const value = { currentUser };
   return <AuthContext.Provider value={value}>{!loading && children}</AuthContext.Provider>;
 };
 
-// --- PRIVATE ROUTE COMPONENT ---
-const PrivateRoute = ({ children }) => {
-  const { currentUser } = useAuth();
-  return currentUser ? children : <Navigate to="/login" />;
-};
+// --- PRIVATE ROUTE ---
+const PrivateRoute = ({ children }) => (useAuth().currentUser ? children : <Navigate to="/login" />);
 
 // --- PAGES ---
-const HomePage = () => (
-  <div className="card">
-    <h1>The Future of WhatsApp is <span>Simplicity.</span></h1>
-    <p>Harness the power of your own customizable bot, managed from a stunning web dashboard.</p>
-    <Link to="/dashboard"><button className="btn-primary">Create Your Bot Free</button></Link>
-    <Link to="/login"><button className="btn-secondary">Dashboard Login</button></Link>
-  </div>
-);
+const HomePage = () => {
+    const [title, setTitle] = useState("Simplicity.");
+    useEffect(() => {
+        const titles = ["Simplicity.", "Automation."];
+        let i = 0;
+        const intervalId = setInterval(() => {
+            i = (i + 1) % titles.length;
+            setTitle(titles[i]);
+        }, 3000);
+        return () => clearInterval(intervalId);
+    }, []);
+
+    return (
+        <div className="card">
+            <h1>The Future of WhatsApp is <span>{title}</span></h1>
+            <p>Harness the power of a fully customizable bot, managed from a stunning web dashboard.</p>
+            <Link to="/dashboard"><button className="btn-primary">Create Your Bot Free</button></Link>
+            <Link to="/login"><button className="btn-secondary">Dashboard Login</button></Link>
+            <div className="features">
+                <div className="feature-card"><h3>Anti-Delete</h3><p>Capture deleted messages.</p></div>
+                <div className="feature-card"><h3>Public/Private</h3><p>Control who can use your bot.</p></div>
+                <div className="feature-card"><h3>Group Manager</h3><p>Tools like Antilink and Tagall.</p></div>
+                <div className="feature-card"><h3>Free Forever</h3><p>All features, no hidden costs.</p></div>
+            </div>
+        </div>
+    );
+};
 
 const LoginPage = () => {
-  const emailRef = useRef();
-  const passwordRef = useRef();
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const emailRef = useRef(); const passwordRef = useRef();
+  const [error, setError] = useState(''); const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleAuth = async (authFunc, errorMsg) => {
@@ -71,10 +80,8 @@ const LoginPage = () => {
 };
 
 const DashboardPage = () => {
-  const { currentUser } = useAuth();
-  const navigate = useNavigate();
-  const [botData, setBotData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { currentUser } = useAuth(); const navigate = useNavigate();
+  const [botData, setBotData] = useState(null); const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'bots', currentUser.uid), (doc) => {
@@ -85,20 +92,20 @@ const DashboardPage = () => {
   }, [currentUser.uid]);
 
   const handleCreateBot = async () => {
-    const phone = prompt("Enter WhatsApp number with country code (e.g., 14155552671 for USA). No '+' or spaces.");
+    const phone = prompt("Enter WhatsApp number with country code (e.g., 14155552671). No '+' or spaces.");
     if (phone && /^\d+$/.test(phone)) {
       setLoading(true);
       await setDoc(doc(db, 'bots', currentUser.uid), {
-        ownerId: currentUser.uid, phoneNumber: phone, status: 'REQUESTING_QR', prefix: '.', pairingCode: null, botMode: 'public',
+        ownerId: currentUser.uid, phoneNumber: phone, status: 'REQUESTING_QR', prefix: '.',
+        pairingCode: null, botMode: 'public', ownerEmail: currentUser.email,
       });
-    } else { alert("Invalid number. Please enter numbers only."); }
+    } else { alert("Invalid number."); }
   };
 
   const handleDeleteBot = async () => {
     if (window.confirm("Are you sure you want to delete your bot? This action cannot be undone.")) {
         setLoading(true);
         await deleteDoc(doc(db, 'bots', currentUser.uid));
-        // The onSnapshot listener will automatically update the UI
     }
   };
   
@@ -119,15 +126,14 @@ const DashboardPage = () => {
         </div>
       ) : (
         <div className="status-box">
-          <h3>Bot Status: <span className={botData.status === 'CONNECTED' ? 'status-connected' : 'status-error'}>{botData.status}</span></h3>
-          <p><strong>Phone:</strong> {botData.phoneNumber}</p>
-          <p><strong>Mode:</strong> {botData.botMode || 'public'}</p>
+          <h3>Status: <span className={botData.status === 'CONNECTED' ? 'status-connected' : 'status-error'}>{botData.status}</span></h3>
+          <p><strong>Phone:</strong> {botData.phoneNumber} | <strong>Mode:</strong> {botData.botMode || 'public'}</p>
           
-          {botData.status === 'REQUESTING_QR' && botData.pairingCode && (
-            <div>
+          {botData.status === 'REQUESTING_QR' && (
+            botData.pairingCode ? <div>
               <p>Go to WhatsApp &gt; Linked Devices &gt; "Link with phone number instead" and enter:</p>
               <h2 className="code">{botData.pairingCode}</h2>
-            </div>
+            </div> : <p>Requesting pairing code...</p>
           )}
 
           {botData.status === 'CONNECTED' && <p className="status-connected">✅ Your bot is live and responding to commands!</p>}
@@ -141,17 +147,17 @@ const DashboardPage = () => {
   );
 };
 
-// --- MAIN APP COMPONENT ---
+// --- MAIN APP ---
 export default function App() {
-    return (
-        <Router>
-            <AuthProvider>
-                <Routes>
-                    <Route path="/" element={<HomePage />} />
-                    <Route path="/login" element={<LoginPage />} />
-                    <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
-                </Routes>
-            </AuthProvider>
-        </Router>
-    );
+  return (
+    <Router>
+      <AuthProvider>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
+        </Routes>
+      </AuthProvider>
+    </Router>
+  );
 }
