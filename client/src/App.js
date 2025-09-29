@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, Navigate } from 'react-router-dom';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, deleteDoc } from 'firebase/firestore';
 
 // --- AUTHENTICATION CONTEXT ---
 const AuthContext = React.createContext();
@@ -32,11 +32,11 @@ const PrivateRoute = ({ children }) => {
 
 // --- PAGES ---
 const HomePage = () => (
-  <div>
-    <h1>Welcome to NightWaBot</h1>
-    <p>The Future of WhatsApp is Simplicity.</p>
-    <Link to="/dashboard"><button>Create Your Bot Free</button></Link>
-    <Link to="/login"><button>Dashboard Login</button></Link>
+  <div className="card">
+    <h1>The Future of WhatsApp is <span>Simplicity.</span></h1>
+    <p>Harness the power of your own customizable bot, managed from a stunning web dashboard.</p>
+    <Link to="/dashboard"><button className="btn-primary">Create Your Bot Free</button></Link>
+    <Link to="/login"><button className="btn-secondary">Dashboard Login</button></Link>
   </div>
 );
 
@@ -49,25 +49,22 @@ const LoginPage = () => {
 
   const handleAuth = async (authFunc, errorMsg) => {
     try {
-      setError('');
-      setLoading(true);
+      setError(''); setLoading(true);
       await authFunc(auth, emailRef.current.value, passwordRef.current.value);
       navigate('/dashboard');
-    } catch (err) {
-      setError(errorMsg);
-    }
+    } catch (err) { setError(errorMsg); }
     setLoading(false);
   };
 
   return (
-    <div>
-      <h2>Login or Sign Up</h2>
-      {error && <p style={{color: '#cf6679'}}>{error}</p>}
+    <div className="card">
+      <h2>Dashboard <span>Login</span></h2>
+      {error && <p className="status-error">{error}</p>}
       <form onSubmit={(e) => e.preventDefault()}>
-        <label>Email</label><input type="email" ref={emailRef} required />
-        <label>Password</label><input type="password" ref={passwordRef} required />
-        <button disabled={loading} onClick={() => handleAuth(signInWithEmailAndPassword, 'Failed to log in.')}>Log In</button>
-        <button disabled={loading} onClick={() => handleAuth(createUserWithEmailAndPassword, 'Failed to sign up.')}>Sign Up</button>
+        <input type="email" ref={emailRef} required placeholder="Email Address"/>
+        <input type="password" ref={passwordRef} required placeholder="Password"/>
+        <button className="btn-primary" disabled={loading} onClick={() => handleAuth(signInWithEmailAndPassword, 'Failed to log in.')}>Log In</button>
+        <button className="btn-secondary" disabled={loading} onClick={() => handleAuth(createUserWithEmailAndPassword, 'Failed to sign up.')}>Sign Up</button>
       </form>
     </div>
   );
@@ -88,50 +85,61 @@ const DashboardPage = () => {
   }, [currentUser.uid]);
 
   const handleCreateBot = async () => {
-    const phone = prompt("Enter WhatsApp number with country code (e.g., 14155552671):");
+    const phone = prompt("Enter WhatsApp number with country code (e.g., 14155552671 for USA). No '+' or spaces.");
     if (phone && /^\d+$/.test(phone)) {
       setLoading(true);
       await setDoc(doc(db, 'bots', currentUser.uid), {
-        ownerId: currentUser.uid, phoneNumber: phone, status: 'REQUESTING_QR', prefix: '.', pairingCode: null,
+        ownerId: currentUser.uid, phoneNumber: phone, status: 'REQUESTING_QR', prefix: '.', pairingCode: null, botMode: 'public',
       });
-    } else {
-      alert("Invalid number. Please enter numbers only.");
+    } else { alert("Invalid number. Please enter numbers only."); }
+  };
+
+  const handleDeleteBot = async () => {
+    if (window.confirm("Are you sure you want to delete your bot? This action cannot be undone.")) {
+        setLoading(true);
+        await deleteDoc(doc(db, 'bots', currentUser.uid));
+        // The onSnapshot listener will automatically update the UI
     }
   };
   
   if (loading) return <h1>Loading...</h1>;
 
   return (
-    <div>
-      <h1>Dashboard</h1>
+    <div className="card">
+      <h1>Bot <span>Dashboard</span></h1>
       <p>Welcome, {currentUser.email}</p>
-      <button onClick={() => { signOut(auth); navigate('/login'); }}>Log Out</button>
+      <button className="btn-secondary" onClick={() => { signOut(auth); navigate('/login'); }}>Log Out</button>
       <hr />
       
       {!botData ? (
         <div>
           <h2>No Bot Found</h2>
-          <button onClick={handleCreateBot}>Create Your Bot</button>
+          <p>Click below to link your WhatsApp and bring your bot to life.</p>
+          <button className="btn-primary" onClick={handleCreateBot}>Create Your Bot</button>
         </div>
       ) : (
-        <div>
-          <h2>Bot Status: <span style={{color: '#bb86fc'}}>{botData.status}</span></h2>
+        <div className="status-box">
+          <h3>Bot Status: <span className={botData.status === 'CONNECTED' ? 'status-connected' : 'status-error'}>{botData.status}</span></h3>
           <p><strong>Phone:</strong> {botData.phoneNumber}</p>
+          <p><strong>Mode:</strong> {botData.botMode || 'public'}</p>
+          
           {botData.status === 'REQUESTING_QR' && botData.pairingCode && (
-            <div style={{border: '1px solid #bb86fc', padding: '15px', marginTop: '20px'}}>
-              <h3>Enter This Code on WhatsApp:</h3>
-              <p>Go to Settings &gt; Linked Devices &gt; Link with phone number.</p>
-              <h2 style={{ fontFamily: 'monospace', letterSpacing: '4px', color: '#03dac6' }}>{botData.pairingCode}</h2>
+            <div>
+              <p>Go to WhatsApp &gt; Linked Devices &gt; "Link with phone number instead" and enter:</p>
+              <h2 className="code">{botData.pairingCode}</h2>
             </div>
           )}
-          {botData.status === 'CONNECTED' && <h3 style={{color: '#03dac6'}}>✅ Bot is running!</h3>}
-          {botData.status === 'LOGGED_OUT' && <div style={{color: '#cf6679'}}><h3>⚠️ Bot was logged out.</h3><button onClick={handleCreateBot}>Re-Link Bot</button></div>}
+
+          {botData.status === 'CONNECTED' && <p className="status-connected">✅ Your bot is live and responding to commands!</p>}
+          {botData.status === 'LOGGED_OUT' && <div className="status-error"><p>⚠️ Bot was logged out.</p><button className="btn-primary" onClick={handleCreateBot}>Re-Link Bot</button></div>}
+          
+          <hr/>
+          <button className="btn-danger" onClick={handleDeleteBot}>Delete Bot</button>
         </div>
       )}
     </div>
   );
 };
-
 
 // --- MAIN APP COMPONENT ---
 export default function App() {
