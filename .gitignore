@@ -1,0 +1,16 @@
+# Dependencies
+/node_modules
+/client/node_modules
+
+# Build folder
+/client/build
+
+# Credentials
+/serviceAccountKey.json
+
+# Auth State
+/auth_info_baileys
+
+# Lock files
+package-lock.json
+client/package-lock.json
