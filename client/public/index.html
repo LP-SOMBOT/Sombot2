@@ -5,13 +5,105 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>NightWaBot</title>
     <style>
-      body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif; background-color: #121212; color: #e0e0e0; padding: 20px; }
-      button { background-color: #6200ee; color: white; font-size: 16px; border: none; padding: 10px 18px; margin: 8px 5px; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }
-      button:hover { background-color: #3700b3; }
-      button:disabled { background-color: #333; cursor: not-allowed; }
-      input { display: block; margin-bottom: 12px; padding: 10px; font-size: 16px; width: 250px; background-color: #333; border: 1px solid #555; color: white; border-radius: 4px; }
-      a { color: #bb86fc; }
-      hr { border-color: #444; }
+      @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+      
+      :root {
+        --background-color: #0d0c22;
+        --card-color: #1a1936;
+        --primary-purple: #8a2be2;
+        --light-purple: #c084fc;
+        --text-color: #e0e0e0;
+        --text-muted: #a0a0a0;
+        --green-accent: #03dac6;
+        --red-accent: #cf6679;
+      }
+      
+      body {
+        margin: 0;
+        font-family: 'Poppins', sans-serif;
+        background-color: var(--background-color);
+        color: var(--text-color);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        text-align: center;
+        overflow-x: hidden;
+      }
+
+      #root {
+        width: 100%;
+        max-width: 500px;
+        padding: 20px;
+      }
+
+      .card {
+        background-color: var(--card-color);
+        padding: 2rem 2.5rem;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+      }
+      
+      h1 { font-size: 2.5rem; font-weight: 700; }
+      h1 span { color: var(--primary-purple); }
+      p { color: var(--text-muted); line-height: 1.6; }
+      
+      button {
+        font-family: 'Poppins', sans-serif;
+        font-weight: 600;
+        font-size: 1rem;
+        border-radius: 8px;
+        border: none;
+        padding: 12px 24px;
+        margin: 10px 5px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+
+      .btn-primary {
+        background: linear-gradient(90deg, var(--primary-purple), var(--light-purple));
+        color: white;
+      }
+      .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(138, 43, 226, 0.4); }
+
+      .btn-secondary {
+        background-color: transparent;
+        border: 2px solid var(--primary-purple);
+        color: var(--primary-purple);
+      }
+      .btn-secondary:hover { background-color: var(--primary-purple); color: white; }
+      
+      input {
+        display: block;
+        width: calc(100% - 24px);
+        margin: 1rem auto;
+        padding: 12px;
+        font-size: 1rem;
+        background-color: var(--background-color);
+        border: 1px solid #444;
+        color: var(--text-color);
+        border-radius: 8px;
+      }
+
+      hr { border: none; height: 1px; background-color: rgba(255, 255, 255, 0.1); margin: 2rem 0; }
+      
+      .status-box {
+        border: 1px solid var(--primary-purple);
+        padding: 1.5rem;
+        margin-top: 2rem;
+        border-radius: 12px;
+      }
+      .status-box h3 { margin-top: 0; }
+      .code {
+        font-family: 'Courier New', Courier, monospace;
+        letter-spacing: 4px;
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: var(--green-accent);
+      }
+      .status-connected { color: var(--green-accent); }
+      .status-error { color: var(--red-accent); }
     </style>
   </head>
   <body>
