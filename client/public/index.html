@@ -6,117 +6,60 @@
     <title>NightWaBot</title>
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
-      
       :root {
-        --background-color: #0c0a1a;
-        --card-color: #161429;
-        --primary-purple: #8a2be2;
-        --light-purple: #a855f7;
-        --text-color: #e5e7eb;
-        --text-muted: #9ca3af;
-        --green-accent: #34d399;
-        --red-accent: #f87171;
-        --glow-color: rgba(168, 85, 247, 0.3);
+        --bg-dark: #0f0f1b; --bg-card: #1c1a2e; --purple: #8c52ff; --light-purple: #a855f7;
+        --text-light: #f0f0f0; --text-muted: #a0a0b0; --green: #2dd4bf; --red: #f87171;
+        --glow: rgba(140, 82, 255, 0.2);
       }
-      
       * { box-sizing: border-box; }
-
       body {
-        margin: 0;
-        font-family: 'Poppins', sans-serif;
-        background-color: var(--background-color);
-        color: var(--text-color);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        min-height: 100vh;
-        text-align: center;
-        overflow: hidden;
-        position: relative;
+        margin: 0; font-family: 'Poppins', sans-serif; background-color: var(--bg-dark);
+        color: var(--text-light); display: flex; justify-content: center; align-items: center;
+        min-height: 100vh; text-align: center; overflow: hidden; position: relative;
       }
       body::before {
-        content: '';
-        position: absolute;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
-        background-image: radial-gradient(circle at 20% 20%, var(--glow-color) 0%, transparent 30%),
-                          radial-gradient(circle at 80% 70%, var(--glow-color) 0%, transparent 30%);
-        filter: blur(100px);
-        z-index: -1;
+        content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        background-image: radial-gradient(circle at 15% 25%, var(--glow) 0%, transparent 25%),
+                          radial-gradient(circle at 85% 75%, var(--glow) 0%, transparent 25%);
+        filter: blur(120px); z-index: -1;
       }
-
-      #root {
-        width: 100%;
-        max-width: 500px;
-        padding: 20px;
-      }
-
+      #root { width: 100%; max-width: 550px; padding: 20px; }
       .card {
-        background: rgba(22, 20, 41, 0.8);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        padding: 2rem 2.5rem;
-        border-radius: 16px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        box-shadow: 0 0 40px var(--glow-color);
+        background: rgba(28, 26, 46, 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        padding: 2.5rem; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 0 50px var(--glow); animation: fadeIn 0.5s ease-out;
       }
-      
-      h1 { font-size: 2.5rem; font-weight: 700; margin-bottom: 0.5rem; }
-      h1 span {
-        background: linear-gradient(90deg, var(--primary-purple), var(--light-purple));
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-      }
-      p { color: var(--text-muted); line-height: 1.6; }
-      
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+      h1 { font-size: 2.8rem; font-weight: 700; margin: 0; }
+      h1 span { color: var(--purple); }
+      p { color: var(--text-muted); line-height: 1.7; }
       button {
-        font-family: 'Poppins', sans-serif;
-        font-weight: 600;
-        font-size: 1rem;
-        border-radius: 8px;
-        border: none;
-        padding: 12px 24px;
-        margin: 10px 5px;
-        cursor: pointer;
-        transition: all 0.3s ease;
+        font-family: 'Poppins', sans-serif; font-weight: 600; font-size: 1rem; border-radius: 8px;
+        border: none; padding: 14px 28px; margin: 10px 5px; cursor: pointer; transition: all 0.3s ease;
       }
-      .btn-primary {
-        background: linear-gradient(90deg, var(--primary-purple), var(--light-purple));
-        color: white;
-      }
-      .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 4px 20px var(--glow-color); }
-      .btn-secondary {
-        background-color: transparent; border: 2px solid var(--primary-purple); color: var(--primary-purple);
-      }
-      .btn-secondary:hover { background-color: var(--primary-purple); color: white; }
-      .btn-danger {
-        background-color: transparent; border: 2px solid var(--red-accent); color: var(--red-accent);
-      }
-      .btn-danger:hover { background-color: var(--red-accent); color: white; }
-      
+      .btn-primary { background: linear-gradient(90deg, var(--purple), var(--light-purple)); color: white; }
+      .btn-primary:hover { transform: scale(1.05); box-shadow: 0 4px 25px var(--glow); }
+      .btn-secondary { background-color: transparent; border: 2px solid var(--purple); color: var(--purple); }
+      .btn-secondary:hover { background-color: var(--purple); color: white; }
+      .btn-danger { background-color: transparent; border: 2px solid var(--red); color: var(--red); }
+      .btn-danger:hover { background-color: var(--red); color: white; }
       input {
-        display: block; width: calc(100% - 24px); margin: 1.5rem auto;
-        padding: 12px; font-size: 1rem; background-color: var(--background-color);
-        border: 1px solid #4a4a6a; color: var(--text-color); border-radius: 8px;
+        display: block; width: calc(100% - 28px); margin: 1.5rem auto; padding: 14px; font-size: 1rem;
+        background-color: var(--bg-dark); border: 1px solid #4a4a6a; color: var(--text-light);
+        border-radius: 8px; transition: border-color 0.3s;
       }
-
+      input:focus { border-color: var(--purple); outline: none; }
       hr { border: none; height: 1px; background-color: rgba(255, 255, 255, 0.1); margin: 2rem 0; }
-      
-      .status-box {
-        background: rgba(13, 10, 34, 0.5);
-        padding: 1.5rem; margin-top: 2rem; border-radius: 12px;
-      }
-      .status-box h3 { margin-top: 0; }
+      .status-box { background: rgba(15, 15, 27, 0.6); padding: 1.5rem; margin-top: 2rem; border-radius: 12px; }
       .code {
-        font-family: 'Courier New', Courier, monospace; letter-spacing: 4px; font-size: 1.8rem;
-        font-weight: 700; color: var(--green-accent); text-shadow: 0 0 10px rgba(52, 211, 153, 0.5);
+        font-family: 'Courier New', monospace; letter-spacing: 5px; font-size: 2rem;
+        font-weight: 700; color: var(--green); text-shadow: 0 0 10px rgba(45, 212, 191, 0.5);
       }
-      .status-connected { color: var(--green-accent); }
-      .status-error { color: var(--red-accent); }
+      .status-connected { color: var(--green); } .status-error { color: var(--red); }
+      .features { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; text-align: left; margin-top: 2rem; }
+      .feature-card { background: var(--bg-dark); padding: 1rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); }
+      .feature-card h3 { margin: 0 0 0.5rem 0; color: var(--purple); }
     </style>
   </head>
-  <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
-  </body>
+  <body><div id="root"></div></body>
 </html>
