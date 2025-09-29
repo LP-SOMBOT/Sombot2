@@ -8,16 +8,19 @@
       @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
       
       :root {
-        --background-color: #0d0c22;
-        --card-color: #1a1936;
+        --background-color: #0c0a1a;
+        --card-color: #161429;
         --primary-purple: #8a2be2;
-        --light-purple: #c084fc;
-        --text-color: #e0e0e0;
-        --text-muted: #a0a0a0;
-        --green-accent: #03dac6;
-        --red-accent: #cf6679;
+        --light-purple: #a855f7;
+        --text-color: #e5e7eb;
+        --text-muted: #9ca3af;
+        --green-accent: #34d399;
+        --red-accent: #f87171;
+        --glow-color: rgba(168, 85, 247, 0.3);
       }
       
+      * { box-sizing: border-box; }
+
       body {
         margin: 0;
         font-family: 'Poppins', sans-serif;
@@ -28,7 +31,18 @@
         align-items: center;
         min-height: 100vh;
         text-align: center;
-        overflow-x: hidden;
+        overflow: hidden;
+        position: relative;
+      }
+      body::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background-image: radial-gradient(circle at 20% 20%, var(--glow-color) 0%, transparent 30%),
+                          radial-gradient(circle at 80% 70%, var(--glow-color) 0%, transparent 30%);
+        filter: blur(100px);
+        z-index: -1;
       }
 
       #root {
@@ -38,15 +52,21 @@
       }
 
       .card {
-        background-color: var(--card-color);
+        background: rgba(22, 20, 41, 0.8);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
         padding: 2rem 2.5rem;
         border-radius: 16px;
         border: 1px solid rgba(255, 255, 255, 0.1);
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        box-shadow: 0 0 40px var(--glow-color);
       }
       
-      h1 { font-size: 2.5rem; font-weight: 700; }
-      h1 span { color: var(--primary-purple); }
+      h1 { font-size: 2.5rem; font-weight: 700; margin-bottom: 0.5rem; }
+      h1 span {
+        background: linear-gradient(90deg, var(--primary-purple), var(--light-purple));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
       p { color: var(--text-muted); line-height: 1.6; }
       
       button {
@@ -60,47 +80,36 @@
         cursor: pointer;
         transition: all 0.3s ease;
       }
-
       .btn-primary {
         background: linear-gradient(90deg, var(--primary-purple), var(--light-purple));
         color: white;
       }
-      .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(138, 43, 226, 0.4); }
-
+      .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 4px 20px var(--glow-color); }
       .btn-secondary {
-        background-color: transparent;
-        border: 2px solid var(--primary-purple);
-        color: var(--primary-purple);
+        background-color: transparent; border: 2px solid var(--primary-purple); color: var(--primary-purple);
       }
       .btn-secondary:hover { background-color: var(--primary-purple); color: white; }
+      .btn-danger {
+        background-color: transparent; border: 2px solid var(--red-accent); color: var(--red-accent);
+      }
+      .btn-danger:hover { background-color: var(--red-accent); color: white; }
       
       input {
-        display: block;
-        width: calc(100% - 24px);
-        margin: 1rem auto;
-        padding: 12px;
-        font-size: 1rem;
-        background-color: var(--background-color);
-        border: 1px solid #444;
-        color: var(--text-color);
-        border-radius: 8px;
+        display: block; width: calc(100% - 24px); margin: 1.5rem auto;
+        padding: 12px; font-size: 1rem; background-color: var(--background-color);
+        border: 1px solid #4a4a6a; color: var(--text-color); border-radius: 8px;
       }
 
       hr { border: none; height: 1px; background-color: rgba(255, 255, 255, 0.1); margin: 2rem 0; }
       
       .status-box {
-        border: 1px solid var(--primary-purple);
-        padding: 1.5rem;
-        margin-top: 2rem;
-        border-radius: 12px;
+        background: rgba(13, 10, 34, 0.5);
+        padding: 1.5rem; margin-top: 2rem; border-radius: 12px;
       }
       .status-box h3 { margin-top: 0; }
       .code {
-        font-family: 'Courier New', Courier, monospace;
-        letter-spacing: 4px;
-        font-size: 1.8rem;
-        font-weight: 700;
-        color: var(--green-accent);
+        font-family: 'Courier New', Courier, monospace; letter-spacing: 4px; font-size: 1.8rem;
+        font-weight: 700; color: var(--green-accent); text-shadow: 0 0 10px rgba(52, 211, 153, 0.5);
       }
       .status-connected { color: var(--green-accent); }
       .status-error { color: var(--red-accent); }
