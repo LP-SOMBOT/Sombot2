@@ -16,9 +16,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // --- INITIALIZE FIREBASE ADMIN ---
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
+admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const db = admin.firestore();
 console.log('Firebase Admin Initialized.');
 
@@ -41,51 +39,55 @@ async function startBot(uid) {
     if (connection === 'open') {
       console.log(`Connection opened for ${uid}. Bot is ready.`);
       await db.collection('bots').doc(uid).update({ status: 'CONNECTED', pairingCode: null });
-
-      // --- NEW: SEND WELCOME MESSAGE ---
       const botJid = sock.user.id;
-      await sock.sendMessage(botJid, {
-        text: "✅ *Welcome!* Your bot is now connected and online.\n\nType `.menu` to see available commands."
-      });
+      await sock.sendMessage(botJid, { text: "✅ *Welcome!* Your bot is now connected and online.\n\nType `.menu` to see available commands." });
     }
     if (connection === 'close') {
       const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
       activeBots.delete(uid);
-      if (shouldReconnect) {
-        startBot(uid);
-      } else {
-        await db.collection('bots').doc(uid).update({ status: 'LOGGED_OUT' });
-      }
+      if (shouldReconnect) { startBot(uid); } 
+      else { await db.collection('bots').doc(uid).update({ status: 'LOGGED_OUT' }); }
     }
   });
 
   sock.ev.on('creds.update', saveCreds);
 
-  // --- MESSAGE HANDLER (WITH NEW COMMANDS) ---
+  // --- MESSAGE HANDLER (WITH ALL NEW FEATURES) ---
   sock.ev.on('messages.upsert', async (m) => {
     const msg = m.messages[0];
-    if (!msg.message) return;
+    if (!msg.message || msg.key.fromMe) return;
 
-    const messageText = msg.message.conversation || msg.message.extendedTextMessage?.text || "";
+    const botSettingsDoc = await db.collection('bots').doc(uid).get();
+    if (!botSettingsDoc.exists) return;
+    const botSettings = botSettingsDoc.data();
+
     const remoteJid = msg.key.remoteJid;
     const isGroup = remoteJid.endsWith('@g.us');
-    const sender = msg.key.participant || msg.key.remoteJid;
+    const sender = isGroup ? msg.key.participant : msg.key.remoteJid;
+    const messageText = msg.message.conversation || msg.message.extendedTextMessage?.text || "";
 
-    // --- ANTILINK LOGIC ---
-    if (isGroup && (messageText.includes('https://') || messageText.includes('http://'))) {
+    // --- MODE CHECK: If bot is private, only owner can use commands ---
+    const ownerJid = botSettings.phoneNumber + "@s.whatsapp.net";
+    if (botSettings.botMode === 'private' && sender !== ownerJid) {
+        return; // Ignore commands from others if in private mode
+    }
+
+    // --- ANTILINK LOGIC (FIXED) ---
+    if (isGroup && (messageText.includes('https://chat.whatsapp.com') || messageText.includes('http://'))) {
         const groupSettingsRef = db.collection('bots').doc(uid).collection('groups').doc(remoteJid);
         const groupDoc = await groupSettingsRef.get();
 
         if (groupDoc.exists() && groupDoc.data().antilink) {
             const metadata = await sock.groupMetadata(remoteJid);
-            const participant = metadata.participants.find(p => p.id === sender);
-            const isAdmin = participant?.admin === 'superadmin' || participant?.admin === 'admin';
+            const botIsAdmin = metadata.participants.find(p => p.id === sock.user.id)?.admin;
             
-            // If sender is NOT an admin, delete the message
-            if (!isAdmin) {
-                console.log(`[Antilink] Deleting link from non-admin in ${remoteJid}`);
-                await sock.sendMessage(remoteJid, { delete: msg.key });
-                await sock.sendMessage(remoteJid, { text: `_Link deleted. Sending links is not allowed here._`});
+            if (botIsAdmin) {
+                const senderIsAdmin = metadata.participants.find(p => p.id === sender)?.admin;
+                if (!senderIsAdmin) {
+                    console.log(`[Antilink] Deleting link from non-admin in ${remoteJid}`);
+                    await sock.sendMessage(remoteJid, { delete: msg.key });
+                    await sock.sendMessage(remoteJid, { text: `@${sender.split('@')[0]}, sending group links is not allowed here.`, mentions: [sender]}, { quoted: msg });
+                }
             }
         }
     }
@@ -96,46 +98,66 @@ async function startBot(uid) {
     const command = messageText.slice(prefix.length).trim().split(' ')[0].toLowerCase();
     const args = messageText.trim().split(/ +/).slice(1);
 
-    if (command === 'ping') {
-      await sock.sendMessage(remoteJid, { text: 'Pong!' }, { quoted: msg });
+    const isOwner = sender === ownerJid;
+    let metadata, participants, isAdmin;
+    if (isGroup) {
+        metadata = await sock.groupMetadata(remoteJid);
+        participants = metadata.participants;
+        isAdmin = participants.find(p => p.id === sender)?.admin;
     }
 
-    if (command === 'menu') {
-      const menuText = `*Bot Menu* 🤖\n\n` +
-        `⦿ *.ping* - Check if the bot is alive.\n` +
-        `⦿ *.menu* - Shows this menu.\n\n` +
-        `*Group Commands:*\n` +
-        `⦿ *.antilink on* - Enable antilink.\n` +
-        `⦿ *.antilink off* - Disable antilink.\n\n` +
-        `_Bot must be admin to use group commands._`;
-      await sock.sendMessage(remoteJid, { text: menuText }, { quoted: msg });
-    }
+    switch (command) {
+        case 'ping':
+            await sock.sendMessage(remoteJid, { text: 'Pong! ⚡' }, { quoted: msg });
+            break;
 
-    if (command === 'antilink') {
-        if (!isGroup) {
-            return await sock.sendMessage(remoteJid, { text: "This command can only be used in groups." }, { quoted: msg });
-        }
-        
-        const metadata = await sock.groupMetadata(remoteJid);
-        const participant = metadata.participants.find(p => p.id === sender);
-        const isAdmin = participant?.admin === 'superadmin' || participant?.admin === 'admin';
+        case 'menu':
+            const menuText = `*Bot Menu* 🤖\n\n` +
+              `⦿ *.ping* - Check bot's responsiveness.\n` +
+              `⦿ *.menu* - Shows this command list.\n\n` +
+              `*Group Commands (Admin Only):*\n` +
+              `⦿ *.antilink on|off* - Enable/disable WhatsApp group link detection.\n` +
+              `⦿ *.tagall [message]* - Mentions all members in the group.\n\n` +
+              `*Owner Commands:*\n` +
+              `⦿ *.mode public|private* - Set who can use the bot.`;
+            await sock.sendMessage(remoteJid, { text: menuText }, { quoted: msg });
+            break;
 
-        if (!isAdmin) {
-            return await sock.sendMessage(remoteJid, { text: "Only group admins can use this command." }, { quoted: msg });
-        }
-        
-        const groupSettingsRef = db.collection('bots').doc(uid).collection('groups').doc(remoteJid);
-        const option = args[0]?.toLowerCase();
+        case 'mode':
+            if (!isOwner) return await sock.sendMessage(remoteJid, { text: "🔒 This is an owner-only command." }, { quoted: msg });
+            const mode = args[0]?.toLowerCase();
+            if (mode === 'public' || mode === 'private') {
+                await db.collection('bots').doc(uid).update({ botMode: mode });
+                await sock.sendMessage(remoteJid, { text: `✅ Bot mode has been set to *${mode}*.` }, { quoted: msg });
+            } else {
+                await sock.sendMessage(remoteJid, { text: "Usage: .mode public | private" }, { quoted: msg });
+            }
+            break;
 
-        if (option === 'on') {
-            await groupSettingsRef.set({ antilink: true }, { merge: true });
-            await sock.sendMessage(remoteJid, { text: "✅ Antilink has been enabled." }, { quoted: msg });
-        } else if (option === 'off') {
-            await groupSettingsRef.set({ antilink: false }, { merge: true });
-            await sock.sendMessage(remoteJid, { text: "❌ Antilink has been disabled." }, { quoted: msg });
-        } else {
-            await sock.sendMessage(remoteJid, { text: "Usage: .antilink on | off" }, { quoted: msg });
-        }
+        case 'antilink':
+            if (!isGroup || !isAdmin) return await sock.sendMessage(remoteJid, { text: "🔒 This is a group admin-only command." }, { quoted: msg });
+            const option = args[0]?.toLowerCase();
+            const botIsAdminCheck = participants.find(p => p.id === sock.user.id)?.admin;
+            if (!botIsAdminCheck) return await sock.sendMessage(remoteJid, { text: "I need to be an admin to manage links." }, { quoted: msg });
+
+            const groupSettingsRef = db.collection('bots').doc(uid).collection('groups').doc(remoteJid);
+            if (option === 'on') {
+                await groupSettingsRef.set({ antilink: true }, { merge: true });
+                await sock.sendMessage(remoteJid, { text: "✅ Antilink has been enabled." }, { quoted: msg });
+            } else if (option === 'off') {
+                await groupSettingsRef.set({ antilink: false }, { merge: true });
+                await sock.sendMessage(remoteJid, { text: "❌ Antilink has been disabled." }, { quoted: msg });
+            } else {
+                await sock.sendMessage(remoteJid, { text: "Usage: .antilink on | off" }, { quoted: msg });
+            }
+            break;
+
+        case 'tagall':
+            if (!isGroup || !isAdmin) return await sock.sendMessage(remoteJid, { text: "🔒 This is a group admin-only command." }, { quoted: msg });
+            const message = args.join(' ') || 'Attention everyone!';
+            const mentionJids = participants.map(p => p.id);
+            await sock.sendMessage(remoteJid, { text: message, mentions: mentionJids }, { quoted: msg });
+            break;
     }
   });
 
@@ -154,7 +176,7 @@ async function startBot(uid) {
   }
 }
 
-// --- FIRESTORE LISTENER (UNCHANGED) ---
+// --- FIRESTORE LISTENER (WITH DELETION HANDLING) ---
 db.collection('bots').onSnapshot(snapshot => {
   snapshot.docChanges().forEach(change => {
     const uid = change.doc.id;
@@ -162,13 +184,17 @@ db.collection('bots').onSnapshot(snapshot => {
     if (change.type === 'added' || change.type === 'modified') {
       if (data.status === 'REQUESTING_QR' && !activeBots.has(uid)) startBot(uid);
     }
+    if (change.type === 'removed') {
+        if (activeBots.has(uid)) {
+            console.log(`Bot document for ${uid} removed. Logging out and stopping bot.`);
+            activeBots.get(uid).logout();
+            activeBots.delete(uid);
+        }
+    }
   });
 });
 
-// --- CATCH-ALL ROUTE (UNCHANGED) ---
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'client', 'build', 'index.html'));
-});
-
-// --- START SERVER (UNCHANGED) ---
+// --- CATCH-ALL ROUTE ---
+app.get('*', (req, res) => { res.sendFile(path.join(__dirname, 'client', 'build', 'index.html')); });
+// --- START SERVER ---
 app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
